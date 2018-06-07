@@ -4,25 +4,25 @@
 // Definitions: https://github.com/DefinitelyTyped/DefinitelyTyped
 
 /// <reference types="node" />
+/// <reference types="express" />
+/// <reference types="winston" />
 
 import { EventEmitter } from "events";
+import { Express } from "express";
+import { LoggerInstance } from "winston";
 
-/*~ If this module has methods, declare them as functions like so.
- */
-export function myMethod(a: string): string;
-export function myOtherMethod(a: number): number;
-
-
-export interface UserProfile {
+declare class UserProfile {
     id: string;
     name: string;
-    avatar: string;
-    country: string;
-    language: string;
-    api_version: number;
+    avatar?: string;
+    country?: string;
+    language?: string;
+    api_version?: number;
+
+    constructor(id: string, name: string, avatar?: string, country?: string, language?: string, api_version?: number);
 }
 
-export namespace Message {
+declare namespace Message {
 
     class Message {
         timestamp: number;
@@ -31,39 +31,41 @@ export namespace Message {
         keyboard: object;
         requiredArguments: string[];
         minApiVersion: number;
+
+        constructor(requiredArguments: string[], keyboard?: object, trackingData?: string, timestamp?: number, token?: string, minApiVersion?: number);
     }
 
-    export class Text extends Message {
+    class Text extends Message {
         text: string;
         constructor(text: string, keyboard?: object, trackingData?: string, timestamp?: number, token?: string, minApiVersion?: number);
     }
 
-    export class Url extends Message {
+    class Url extends Message {
         url: string;
         constructor(url: string, keyboard?: object, trackingData?: string, timestamp?: number, token?: string, minApiVersion?: number);
     }
 
-    export class Contact extends Message {
+    class Contact extends Message {
         contactName: string;
         contactPhoneNumber: string;
         optionalAvatar?: string;
         constructor(contactName: string, contactPhoneNumber: string, avatar?: string, keyboard?: object, trackingData?: string, timestamp?: number, token?: string, minApiVersion?: number);
     }
 
-    export class Location extends Message {
+    class Location extends Message {
         latitude: string;
 	    longitude: string;
         constructor(latitude: string, longitude: string, keyboard?: object, trackingData?: string, timestamp?: number, token?: string, minApiVersion?: number);
     }
 
-    export class Picture extends Message {
+    class Picture extends Message {
         url: string;
         text?: string;
         thumbnail?: string;
         constructor(url: string, text?: string, thumbnail?: string, keyboard?: object, trackingData?: string, timestamp?: number, token?: string, minApiVersion?: number);
     }
 
-    export class Video extends Message {
+    class Video extends Message {
         url: string;
         size: number
         text?: string;
@@ -72,26 +74,26 @@ export namespace Message {
         constructor(url: string, size: number, text?: string, thumbnail?: string, duration?: number, keyboard?: object, trackingData?: string, timestamp?: number, token?: string, minApiVersion?: number);
     }
 
-    export class Sticker extends Message {
+    class Sticker extends Message {
         stickerId: string;
         constructor(stickerId: string, keyboard?: object, trackingData?: string, timestamp?: number, token?: string, minApiVersion?: number);
     }
 
-    export class RichMedia extends Message {
+    class RichMedia extends Message {
         richMedia: string;
 	    altText?: string;
         constructor(richMedia: string, keyboard?: object, trackingData?: string, timestamp?: number, token?: string, altText?: string, minApiVersion?: number);
     }
 
-    export class Keyboard extends Message {
+    class Keyboard extends Message {
         constructor(keyboard: object, trackingData?: string, timestamp?: number, token?: string, minApiVersion?: number);
     }
 }
 
-interface Response {
+interface ApiResponse {
     status: number;
     status_message: string;
-    event_types: string[];
+    event_types: Events[];
 }
 
 interface User extends UserProfile {
@@ -111,7 +113,7 @@ interface Location {
     long: number;
 }
 
-interface AccountInfo extends Response {
+interface AccountInfo extends ApiResponse {
     id: string;
     name: string;
     uri: string;
@@ -126,45 +128,79 @@ interface AccountInfo extends Response {
     members: User[];
 }
 
-interface UserDetails extends Response {
+interface UserDetails extends ApiResponse {
     message_token: number;
     user: User;
 }
 
-interface UserStatus extends Response {
+interface UserStatus extends ApiResponse {
     users: User[]
 }
 
-/*~ You can declare properties of the module using const, let, or var */
-export const myField: number;
+declare class Response {
+    bot: Bot;
+    userProfile: UserProfile;
+    silent: boolean;
+    replyType: string;
+    chatId: string;
 
-/*~ If there are types, properties, or methods inside dotted names
- *~ of the module, declare them inside a 'namespace'.
- */
-export interface Bot extends EventEmitter {
+    constructor(bot: Bot, userProfile: UserProfile, silent: boolean, replyType: string, chatId: string);
 
-    getBotProfile(): AccountInfo;
+    send(message: Message.Message, trackingData?: object): Promise<ApiResponse>;
+    send(messages: Message.Message[], trackingData?: object): Promise<ApiResponse>;
+}
 
-    getUserDetails(userProfile: UserProfile): User;
+interface BotConfiguration {
+    logger?: LoggerInstance,
+    authToken: string;
+    name: string;
+    avatar: string;
+    registerToEvents?: Events[];
+}
 
-    getOnlineStatus(viberUserIds: string[]): UserStatus;
+declare class Bot extends EventEmitter {
 
-    setWebhook(url: string, isInline: boolean): Response;
+    constructor(configuration: BotConfiguration);
 
-    sendMessage(userProfile: UserProfile, message: Message, optionalTrackingData?: any, optionalChatId?: string): User;
-    sendMessage(userProfile: UserProfile, messages: Message[], optionalTrackingData?: any, optionalChatId?: string): User;
+    getBotProfile(): Promise<AccountInfo>;
 
-    postToPublicChat(userProfile: UserProfile): User;
+    getUserDetails(userProfile: UserProfile): Promise<User>;
 
-    middleware(userProfile: UserProfile): User;
+    getOnlineStatus(viberUserIds: string[]): Promise<UserStatus>;
 
-    onTextMessage(userProfile: UserProfile): User;
+    setWebhook(url: string, isInline?: boolean): Promise<ApiResponse>;
 
-    onError(userProfile: UserProfile): User;
+    sendMessage(userProfile: UserProfile, message: Message.Message, trackingData?: object, chatId?: string): ApiResponse;
+    sendMessage(userProfile: UserProfile, messages: Message.Message[], trackingData?: object, chatId?: string): ApiResponse;
 
-    onConversationStarted(userProfile: UserProfile): User;
+    postToPublicChat(userProfile: UserProfile, message: Message.Message): Promise<ApiResponse>;
+    postToPublicChat(userProfile: UserProfile, messages: Message.Message[]): Promise<ApiResponse>;
 
-    onSubscribe(userProfile: UserProfile): User;
+    middleware(): Express;
 
-    onUnsubscribe(userProfile: UserProfile): User;
+    onTextMessage(regex: RegExp, callback: (message: Message.Text, response: Response) => void): void;
+
+    onError(callback: (error: Error) => void): void;
+
+    onConversationStarted(
+        callback: (
+            userProfile: UserProfile,
+            isSubscribed: boolean,
+            context: string,
+            onFinish: (message: Message.Message|null) => void) => void
+        ): void;
+
+    onSubscribe(callback: (response: Response) => void): void;
+
+    onUnsubscribe(callback: (userId: string) => void): void;
+}
+
+declare enum Events {
+    MESSAGE_RECEIVED = "message",
+	MESSAGE_SENT = "message_sent",
+	SUBSCRIBED = "subscribed",
+	UNSUBSCRIBED = "unsubscribed",
+	CONVERSATION_STARTED = "conversation_started",
+	ERROR = "error",
+	FAILED = "failed"
 }
